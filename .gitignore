@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Virtual env
+venv/
+
+# Env files
+.env
+*.env
+
+# Streamlit
+.streamlit/
+
+# macOS
+.DS_Store
