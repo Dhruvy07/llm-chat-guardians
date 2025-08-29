@@ -50,12 +50,7 @@ cp .env.example .env
 echo "OPENAI_API_KEY=your_api_key_here" >> .env
 ```
 
-### 3. Run Demo
-
-```bash
-# Start the demo Streamlit chatbot
-streamlit run examples/streamlit_demo.py
-```
+See `examples/README.md` for the Streamlit demo and smoke test.
 
 ## 🏗️ Architecture
 
@@ -174,7 +169,17 @@ class SecurityAgent:
                 'confidence_score': float,
                 'blocked': bool,
                 'warnings': List[str],
-                'llm_analysis': Dict
+                'llm_analysis': Dict,
+                'metrics': {
+                    'sexual': {'f1': [], 'precision': [], 'recall': [], 'accuracy': []},
+                    'violence': {'f1': [], 'precision': [], 'recall': [], 'accuracy': []},
+                    'hate_speech': {'f1': [], 'precision': [], 'recall': [], 'accuracy': []},
+                    'profanity': {'f1': [], 'precision': [], 'recall': [], 'accuracy': []},
+                    'weapons': {'f1': [], 'precision': [], 'recall': [], 'accuracy': []},
+                    'crime': {'f1': [], 'precision': [], 'recall': [], 'accuracy': []},
+                    'prompt_injection': {'f1': [], 'precision': [], 'recall': [], 'accuracy': []},
+                    'jailbreak': {'f1': [], 'precision': [], 'recall': [], 'accuracy': []}
+                }
             }
         """
 ```
@@ -242,10 +247,10 @@ python tests/test_integration.py
 
 ## 📊 Performance
 
-- **Security Analysis**: ~2-4 seconds (GPT-4o)
-- **Context Analysis**: ~1-2 seconds (GPT-3.5-turbo)
+- **Security Analysis**: ~1-1.2 seconds (GPT-4o)
+- **Context Analysis**: ~0-0.8 seconds (GPT-3.5-turbo)
 - **Model Selection**: ~0.5-1 second (GPT-3.5-turbo)
-- **Total Overhead**: ~3-7 seconds per query
+- **Total Overhead**: ~1.5-2.5 seconds per query
 - **Cost**: ~$0.01-0.05 per query (depending on models used)
 
 ## 🔒 Security Features
@@ -295,6 +300,8 @@ black ai_agents/ tests/
 # Run tests with coverage
 pytest --cov=ai_agents tests/
 ```
+
+For demo usage, sample queries, and examples, refer to `examples/README.md`.
 
 ## 📄 License
 

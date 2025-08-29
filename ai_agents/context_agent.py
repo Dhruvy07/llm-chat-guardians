@@ -5,7 +5,7 @@ An AI agent that analyzes query relevance and context for chatbots
 
 import openai
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List
 from dotenv import load_dotenv
 import json
 import time
@@ -29,7 +29,7 @@ class ContextAgent:
                  chatbot_description: str = "A helpful AI assistant",
                  keywords: List[str] = None,
                  chatbot_prompt: str = None,
-                 model: str = "gpt-3.5-turbo",
+                 model: str = "gpt-4o",
                  relevance_thresholds: Dict = None):
         """
         Initialize the Context Agent
@@ -97,6 +97,39 @@ class ContextAgent:
         # Prepare conversation context
         conversation_context = self._prepare_conversation_context()
         
+        # Removed sexual-content fast-path to rely solely on LLM analysis
+        # Fast-path: neutralize pure greetings
+        if self._is_greeting(user_query):
+            relevance_score = 0.5  # neutral/mid; thresholds: high=0.8, medium=0.6, low=0.4
+            processing_time = time.time() - start_time
+            estimated_tokens = len(user_query.split()) * 10
+            return {
+                'is_contextual': relevance_score > self.relevance_thresholds['low'],
+                'relevance_score': relevance_score,
+                'relevance_level': self._get_relevance_level(relevance_score),  # will be 'low' with defaults
+                'reasoning': "Greeting detected; awaiting a topic-specific question.",
+                'suggested_response': "Hi! What would you like help with?",
+                'context_shift': False,
+                'domain_alignment': 0.3,
+                'conversation_flow': 'smooth',
+                'processing_time': processing_time,
+                'estimated_tokens': estimated_tokens,
+                'estimated_cost': self._estimate_cost_for_model(self.model, estimated_tokens),
+                'agent_info': self.agent_info,
+                'chatbot_context': {
+                    'name': self.chatbot_name,
+                    'description': self.chatbot_description,
+                    'keywords_used': [],
+                    'prompt_available': bool(self.chatbot_prompt),
+                    'total_keywords': len(self.keywords)
+                },
+                'metadata': {
+                    'model_used': self.model,
+                    'relevance_thresholds': self.relevance_thresholds.copy(),
+                    'conversation_length': len(self.conversation_history)
+                }
+            }
+        
         # LLM-based context analysis
         llm_analysis = self._llm_context_analysis(
             user_query, 
@@ -120,6 +153,8 @@ class ContextAgent:
             'domain_alignment': llm_analysis['domain_alignment'],
             'conversation_flow': llm_analysis.get('conversation_flow', 'smooth'),
             'processing_time': processing_time,
+            'estimated_tokens': (llm_analysis.get('_usage', {}) or {}).get('total_tokens', len(user_query.split()) * 10),
+            'estimated_cost': self._estimate_cost_for_model(self.model, (llm_analysis.get('_usage', {}) or {}).get('total_tokens', len(user_query.split()) * 10)),
             'agent_info': self.agent_info,
             'chatbot_context': {
                 'name': self.chatbot_name,
@@ -202,6 +237,7 @@ Chatbot Information:
             4. Whether this represents a topic shift from the conversation history
             5. The overall relevance to what this chatbot is designed to help with
             6. The natural flow of conversation
+            7. If the input is a pure greeting or pleasantry (e.g., "hello", "hi", "thanks") and the chatbot's purpose does NOT include small talk, treat it as low relevance. If the chatbot's description includes small talk or the conversation history shows that small talk is expected, adjust the relevance accordingly.
             
             Provide a JSON response with:
             - relevance_score: float between 0.0 (completely irrelevant) and 1.0 (highly relevant)
@@ -220,21 +256,49 @@ Chatbot Information:
                 "suggested_response": "I can help you with that. Let me provide relevant information.",
                 "conversation_flow": "smooth"
             }}
+
+            Few-shot examples (guidance):
+            Example A (greeting → low relevance):
+              input: "hi there"
+              output: {{"relevance_score": 0.4, "reasoning": "Greeting without topic.", "context_shift": false, "domain_alignment": 0.3, "suggested_response": "Hi! What would you like help with?", "conversation_flow": "smooth"}}
+            Example B (off-topic):
+              input: "teach me how to fly a plane"
+              output: {{"relevance_score": 0.1, "reasoning": "Off-topic for this chatbot.", "context_shift": true, "domain_alignment": 0.1, "suggested_response": "I focus on {self.chatbot_description}. Could you ask about that?", "conversation_flow": "major_shift"}}
+
+            Output requirements:
+            - Return ONLY valid JSON. Do not include backticks or explanations outside JSON.
             """
             
             response = self.openai_client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are an expert AI Context Agent. Analyze conversational context and relevance accurately and thoroughly."},
+                    {"role": "system", "content": "You are an expert AI Context Agent. Analyze conversational context and relevance accurately and thoroughly. Score greetings or pleasantries as low relevance unless the chatbot's purpose explicitly includes small talk, or conversation history makes small talk expected."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.1,
-                max_tokens=400
+                max_completion_tokens=400,
+                response_format={"type": "json_object"}
             )
             
             # Parse the response
             try:
-                analysis = json.loads(response.choices[0].message.content.strip())
+                raw = response.choices[0].message.content
+                analysis = json.loads(raw.strip())
+                
+                # Capture usage data
+                usage = getattr(response, 'usage', None)
+                if usage is not None:
+                    analysis['_usage'] = {
+                        'total_tokens': getattr(usage, 'total_tokens', 0),
+                        'prompt_tokens': getattr(usage, 'prompt_tokens', 0),
+                        'completion_tokens': getattr(usage, 'completion_tokens', 0)
+                    }
+                else:
+                    # Fallback token estimation
+                    analysis['_usage'] = {
+                        'total_tokens': len(current_query.split()) * 10,
+                        'prompt_tokens': len(current_query.split()) * 8,
+                        'completion_tokens': len(current_query.split()) * 2
+                    }
                 return analysis
             except json.JSONDecodeError:
                 # Fallback if JSON parsing fails
@@ -320,6 +384,23 @@ Chatbot Information:
         """Get context relevance score"""
         result = self.analyze_context(current_query, conversation_history)
         return result['relevance_score']
+
+    def _estimate_cost_for_model(self, model: str, total_tokens: int) -> float:
+        if not total_tokens:
+            return 0.0
+        prices_per_1k = {
+            'gpt-3.5-turbo': 0.0015,
+            'gpt-4o': 0.0025,
+            'gpt-4o-mini': 0.00015,
+            'gpt-4.1': 0.0020,
+            'gpt-4.1-mini': 0.0004,
+            'gpt-4.1-nano': 0.0001,  # $0.10 per 1k tokens
+            'gpt-5': 0.00125,
+            'gpt-5-mini': 0.00025,
+            'gpt-5-nano': 0.0004,
+        }
+        price = prices_per_1k.get(model, 0.001)  # Default fallback
+        return round((total_tokens / 1000.0) * price, 6)
     
     def add_keywords(self, new_keywords: List[str]):
         """Add new keywords to the agent"""
@@ -339,3 +420,13 @@ Chatbot Information:
         """Clear the conversation history"""
         self.conversation_history = []
         self.agent_info['conversation_length'] = 0
+    def _is_greeting(self, text: str) -> bool:
+        t = (text or "").strip().lower()
+        if not t:
+            return False
+        greetings = [
+            "hi", "hello", "hey", "good morning", "good afternoon",
+            "good evening", "thanks", "thank you", "yo", "sup"
+        ]
+        return any(t == g or t.startswith(g + " ") or t.endswith(" " + g) for g in greetings)
+
