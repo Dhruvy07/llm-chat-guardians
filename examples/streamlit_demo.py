@@ -1,9 +1,10 @@
 """
 AI Agents Demo Streamlit Chatbot
-Demonstrates the three AI agents working together:
+Demonstrates the advanced AI agents working together:
 1. Security Agent - Malicious content detection
 2. Context Agent - Query relevance analysis
 3. Model Selection Agent - Optimal LLM selection
+4. Advanced Conversation Agent - Memory management and RAG
 """
 
 import streamlit as st
@@ -17,7 +18,7 @@ from dotenv import load_dotenv
 # Add the project root to the path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ai_agents import SecurityAgent, ContextAgent, ModelSelectionAgent
+from ai_agents import SecurityAgent, ContextAgent, ModelSelectionAgent, create_basic_agent
 import openai
 
 # Load environment variables
@@ -95,7 +96,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def initialize_agents():
-    """Initialize the three AI agents"""
+    """Initialize the AI agents including conversation agent"""
     if 'agents_initialized' not in st.session_state:
         # Initialize Security Agent
         security_agent = SecurityAgent(
@@ -124,9 +125,15 @@ def initialize_agents():
             performance_preference="balanced"
         )
         
+        # Initialize Advanced Conversation Agent
+        conversation_agent = create_basic_agent(
+            enable_metrics=True
+        )
+        
         st.session_state.security_agent = security_agent
         st.session_state.context_agent = context_agent
         st.session_state.model_selection_agent = model_selection_agent
+        st.session_state.conversation_agent = conversation_agent
         st.session_state.agents_initialized = True
         
         # Initialize OpenAI client
@@ -178,6 +185,28 @@ def render_sidebar():
             st.write(f"**Available Models:** {model_info['available_models_count']}")
             st.write(f"**Cost Sensitivity:** {model_info['cost_sensitivity']}")
             st.write(f"**Capabilities:** {', '.join(model_info['capabilities'][:2])}...")
+        
+        # Conversation Agent
+        with st.sidebar.expander("💬 Conversation Agent", expanded=True):
+            st.write(f"**Status:** ✅ Active")
+            st.write(f"**Memory Type:** Summary Buffer")
+            st.write(f"**History Backend:** In-Memory")
+            st.write(f"**Capabilities:** Memory, Metrics, Export")
+            
+            # Show conversation metrics
+            if hasattr(st.session_state, 'conversation_agent'):
+                user_id = "streamlit_user"
+                metrics = st.session_state.conversation_agent.get_user_metrics(user_id)
+                if metrics:
+                    st.write(f"**Messages:** {metrics.total_messages}")
+                    st.write(f"**Avg Response Time:** {metrics.avg_response_time:.2f}s")
+                    st.write(f"**Total Cost:** ${metrics.total_cost:.4f}")
+                
+                # Show conversation summary
+                summary = st.session_state.conversation_agent.get_conversation_summary(user_id)
+                if summary:
+                    st.write("**Conversation Summary:**")
+                    st.write(summary[:100] + "..." if len(summary) > 100 else summary)
     
     # Configuration
     st.sidebar.subheader("⚙️ Configuration")
@@ -189,7 +218,22 @@ def render_sidebar():
     if st.sidebar.button("🗑️ Clear Conversation"):
         st.session_state.messages = []
         st.session_state.metrics['total_queries'] = 0
+        # Clear conversation agent history
+        if hasattr(st.session_state, 'conversation_agent'):
+            st.session_state.conversation_agent.clear_user_session("streamlit_user")
         st.rerun()
+    
+    # Export conversation
+    if st.sidebar.button("📤 Export Conversation"):
+        if hasattr(st.session_state, 'conversation_agent'):
+            export_data = st.session_state.conversation_agent.export_conversation("streamlit_user")
+            if export_data:
+                st.sidebar.download_button(
+                    label="📥 Download JSON",
+                    data=export_data,
+                    file_name=f"conversation_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json"
+                )
     
     # Metrics
     st.sidebar.subheader("📊 Metrics")
@@ -458,8 +502,8 @@ def main():
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #666; font-size: 0.8rem;">
-        <p>🤖 Powered by Three AI Agents: Security • Context • Model Selection</p>
-        <p>Open Source AI Agents for Enhanced Chatbot Intelligence</p>
+        <p>🤖 Powered by Advanced AI Agents: Security • Context • Model Selection • Conversation Memory</p>
+        <p>Open Source AI Agents for Enhanced Chatbot Intelligence with Enterprise Features</p>
     </div>
     """, unsafe_allow_html=True)
 

@@ -21,7 +21,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
-from ai_agents import SecurityAgent, ContextAgent, ModelSelectionAgent  # noqa: E402
+from ai_agents import SecurityAgent, ContextAgent, ModelSelectionAgent, ConversationAgent  # noqa: E402
 
 
 def run_security_checks(security_agent, prompts):
@@ -106,6 +106,15 @@ def main():
     run_security_checks(security, security_prompts)
     run_context_checks(context, context_prompts)
     run_model_selection_checks(model_sel, model_prompts)
+
+    # ConversationAgent smoke test (no OpenAI key required due to FakeListLLM default)
+    print("\n=== ConversationAgent Smoke Test ===")
+    conv = ConversationAgent()
+    uid = "user_demo"
+    print("Output 1:", conv.invoke(uid, "Hello!"))
+    print("Output 2:", conv.invoke(uid, "Give me context-aware reply"))
+    print("History messages:", [(type(m).__name__, m.content) for m in conv.get_history(uid)])
+    print("Summary:", conv.get_summary(uid))
 
     # Full pipeline sample
     print("\n=== Full Pipeline Sample ===")

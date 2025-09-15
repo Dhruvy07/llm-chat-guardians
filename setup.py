@@ -16,18 +16,18 @@ def read_requirements():
         return [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
 setup(
-    name="ai-agents-chatbot",
-    version="1.0.0",
-    author="Your Name",
-    author_email="your.email@example.com",
-    description="Three intelligent AI agents for enhanced chatbot capabilities",
+    name="agentic-chatbot",
+    version="2.0.0",
+    author="Dhruv Yadav",
+    author_email="dhruv.y@deuexsolutions.com",  # Update with your actual email
+    description="Enterprise-grade AI agents for enhanced chatbot capabilities with RAG, security, and multi-user support",
     long_description=read_readme(),
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/ai-agents-chatbot",
+    url="https://github.com/deuex-solutions/Agentic-Boilerplate",
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/ai-agents-chatbot/issues",
-        "Source": "https://github.com/yourusername/ai-agents-chatbot",
-        "Documentation": "https://github.com/yourusername/ai-agents-chatbot/docs",
+        "Bug Reports": "https://github.com/deuex-solutions/Agentic-Boilerplate/issues",
+        "Source": "https://github.com/deuex-solutions/Agentic-Boilerplate",
+        "Documentation": "https://github.com/deuex-solutions/Agentic-Boilerplate#readme",
     },
     packages=find_packages(),
     classifiers=[
@@ -74,11 +74,15 @@ setup(
     },
     include_package_data=True,
     package_data={
-        "ai_agents": ["*.py", "**/*.py"],
+        "agentic_chatbot": ["*.py", "**/*.py"],
     },
     keywords=[
         "ai", "agents", "chatbot", "security", "context", "model-selection",
-        "openai", "gpt", "llm", "machine-learning", "nlp", "conversational-ai"
+        "openai", "gpt", "llm", "machine-learning", "nlp", "conversational-ai",
+        "rag", "retrieval-augmented-generation", "enterprise", "multi-user",
+        "conversation-memory", "vector-store", "chromadb", "redis", "postgresql",
+        "anthropic", "claude", "google-gemini", "ollama", "langchain",
+        "streaming", "async", "tools", "function-calling", "monitoring", "analytics"
     ],
     license="MIT",
     zip_safe=False,
